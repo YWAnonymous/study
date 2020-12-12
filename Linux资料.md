@@ -742,13 +742,18 @@ docker inspect 容器id
 
 ```shell
 # 命令 docker run -d 镜像名
+然后docker ps -a 进行查看, 会发现容器已经退出
+很重要的要说明的一点: Docker容器后台运行,就必须有一个前台进程(bash/sh).
+容器运行的命令如果不是那些一直挂起的命令（比如运行top，tail），就是会自动退出的。
 ```
 
 ##### 进入当前正在运行的容器
 
+> bash/sh  实质上是一个可执行程序，一个用户的工作环境。
+
 ```shell
 # 命令
-docker exec -it 容器id bashShell
+docker exec -it 容器id /bin/bash
 
 # 测试
 [root@localhost /]# docker exec -it ce989f90023d /bin/bash
@@ -769,6 +774,31 @@ docker cp 容器id:容器内目标文件路径  目的主机路径
 # 将docker内文件拷贝到主机上
 [root@localhost home]# docker cp ce989f90023d:/home/test.java /home
 # 拷贝是一个手动过程，未来我们使用 -v 卷的技术，可以实现自动同步 
+```
+
+**docker logs**
+
+```bash
+# 查看docker容器中的日志
+docker logs -f -t --tail 容器ID
+```
+
+**docker top**
+
+```bash
+# 查看容器内运行的进程
+docker top 容器ID
+```
+
+docker tag
+
+```bash
+# 用于给镜像打标签
+docker tag centos centos:v1
+
+# 运行默认镜像，默认会找tag
+# 运行指定tag的镜像
+docker run centos:v1
 ```
 
 ### 4、容器数据卷
@@ -805,32 +835,6 @@ docker run -it -v 主机目录:容器目录
 ],
 ```
 
-##### 实战练习：MySQL
-
-```SHELL
-# 获取镜像
-[root@localhost home]# docker pull mysql:5.7
-
-# 运行容器，需要做数据挂载！ # 安装mysql,需要配置密码，这是要注意的点！
-# 官方测试：docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag
-
-# 启动我们的MySQL容器
--d	后台运行
--p	端口映射
--v	卷挂载
--e  环境配置
---name  容器名字
-[root@localhost home]# docker run -d -p 3310:3306 -v /home/mysql/conf:/etc/mysql/conf.d -v /home/mysql/data:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 --name mysql01 mysql:5.7
-
-# 启动成功之后，我们在本地使用sqlyog 连接测试一下
-# sqlyog —— 连接到服务器的3310 —— 3310和容器内的3306映射，这个时候我们就可以连接上了！
-
-# 本地测试创建一个数据库，查看一下我们的映射的路径是否ok!
-
-# grant all privileges on *.* to root@'%' identified by "123456";
-# flush privileges;
-```
-
 ##### 具名和匿名
 
 ```shell
@@ -862,9 +866,199 @@ local               juming-nginx
 -v	/宿主机路径:容器内路径   # 指定路径挂载！
 ```
 
+#### 实战练习：MySQL
+
+```shell
+# 获取镜像
+[root@localhost home]# docker pull mysql:5.7
+
+# 运行容器，需要做数据挂载！ # 安装mysql,需要配置密码，这是要注意的点！
+# 官方测试：docker run --name some-mysql -e MYSQL_ROOT_PASSWORD=my-secret-pw -d mysql:tag
+
+# 启动我们的MySQL容器
+-d	后台运行
+-p	端口映射
+-v	卷挂载
+-e  环境配置
+--name  容器名字
+docker run -d -p 3310:3306
+# 提前准备配置文件，否则将容器中文件删除
+-v /home/mysql/conf:/etc/mysql/conf.d   #表示将容器中mysql的配置文件挂载到主机的这个目录，来进行数据的同步和持久化
+-v /home/mysql/data:/var/lib/mysql      #表示将容器中mysql的数据，也就是库文件等挂载到主机中的这个目录，就是对数据的保存
+-e MYSQL_ROOT_PASSWORD=123456 
+--name mysql01 mysql:5.7
+
+# grant all privileges on *.* to root@'%' identified by "123456";
+# flush privileges;
+
+#注意！！！：实现配置挂载时，本地配置目录如果是空目录，那么挂载的时候，mysql容器内的配置目录也会为空（因为挂载了，会同步，同步会将容器内的配置目录也为空），这个时候，容器就无法成功运行。
+
+#解决这个问题，我们只要保证本地配置目录不为空就行了。解决思路有2个 (我用的是第一个)
+
+#1：启动一个容器，将容器内的配置文件 /etc/mysql/my.cnf，copy到我们本地。利用 docker cp命令完成;
+#2.：手动，自己本地新建一个my.cnf配置文件，手动将容器内配置文件 /etc/mysql/my.cnf内容 复制到本地的配置文件中；
+```
+
+> mysql文件目录
+
+```shell
+数据库文件默认在：cd /usr/share/mysql
+配置文件默认在：/etc/my.cnf
+
+数据库目录：/var/lib/mysql/
+配置文件：/usr/share/mysql(mysql.server命令及配置文件)
+相关命令：/usr/bin(mysqladmin、mysqldump等命令)(*mysql的一种安全启动方式：/usr/bin/mysqld_safe –user=root &)
+启动脚本：/etc/rc.d/init.d/
+
+首先你可以使用以下的命令来寻找MySQL
+[root@stuhome /]# find / -name “mysql” -print
+一般来说mysql是放在/usr/local/mysql/下的。
+然后在其bin目录下有个mysql_config文件，vi之，你会看见这么一句：
+ldata=’/usr/local/mysql/var’
+
+rpm安装默认目录：
+数据文件：/var/lib/mysql/
+配置文件模板：/usr/share/mysql
+mysql客户端工具目录：/usr/bin
+日志目录：/var/log/
+pid，sock文件目录：/tmp/
+```
+
+#### redis实战
+
+```shell
+# 官方 
+docker run -v /myredis/conf/redis.conf:/usr/local/etc/redis/redis.conf --name myredis redis redis-server /usr/local/etc/redis/redis.conf
+
+docker run -p 6379:6379 --name myredis -d \
+-v /home/redis/conf/redis.conf:/usr/local/etc/redis/redis.conf \
+-v /home/redis/data:/data \
+redis redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+
+# 连接容器中redis-cli
+docker exec -it 运行着Rediis服务的容器ID redis-cli
+
+```
+
 ### 5、DockerFile
 
+> `dockerfile`是用来构建docker镜像的文件！命令参数脚本！
 
+```markdown
+# 构建步骤：
+1、 编写一个dockerfile文件
+2、 docker build 构建称为一个镜像
+3、 docker run运行镜像
+4、 docker push发布镜像（DockerHub 、阿里云仓库)
+# 基础知识：
+1、每个保留关键字(指令）都是必须是大写字母
+2、执行从上到下顺序
+3、# 表示注释
+4、每一个指令都会创建提交一个新的镜像曾，并提交！
+```
+
+#### DockerFile保留字指令
+
+```shell
+FROM			# 基础镜像，一切从这里开始构建
+MAINTAINER		# 镜像是谁写的，姓名+邮箱
+RUN				# 镜像构建的时候需要运行的命令
+ADD				# 步骤：tomcat镜像，这个tomcat压缩包！ 添加内容
+WORKDIR			# 镜像的工作目录
+VOLUME			# 挂载的目录
+EXPOSE          # 暴露端口配置，跟 -p 是一个道理
+CMD				# 指定这个容器启动时要执行的命令,只有最后一个命令会生效，可悲替代
+ENTRYPOINT		# 指定这个容器启动的时候要执行的命令，可以追加命令
+ONBUILD			# 当构建一个被继承DockerFile 这个时候就会运行ONBUILD的指令。触发指令
+COPY			# 类似ADD,将我们文件拷贝到镜像中
+ENV				# 构建的时候设置环境变量，跟 -e 是一个意思
+
+# CMD 和 ENTRYPOINT 的区别说明：
+# 若CMD 和 ENTRYPOINT 后跟的都是 ls -a 这个命令，当docker run 一个容器时，添加了 -l 选项，
+# 则CMD里的ls -a 命令就会被替换成-l;而ENTRYPOINT中的 ls -a会追加-l变成 ls -a -l  
+
+#CMD 多个 CMD 指令，但只有最后一个生效 
+```
+
+#### 实战练习
+
+> 编写自己的centos
+
+```shell
+# 1、编写Dockerfile文件
+FROM centos
+ 
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+ 
+ 
+EXPOSE 80
+ 
+CMD echo $MYPATH
+CMD echo "success--------------ok"
+CMD /bin/bash
+
+# 2、通过这个文件构建镜像
+# 命令docker build -f dockerfile文件路径 -t 镜像名:[tag] .
+# 默认找Dockerfile文件名
+docker build -f 绝对路径/Dockerfile -t zcg/centos:1.0 .
+
+
+# 3、运行镜像
+docker run -it zcg/centos:1.0 
+```
+
+> 编写自己的tomcat
+
+```shell
+# 1、编写Dockerfile文件 
+FROM centos
+
+COPY readme.txt /usr/local/readme.txt
+
+ADD jdk-8u271-linux-i586.tar.gz    /usr/local/
+ADD apache-tomcat-7.0.70.tar.gz   /usr/local
+
+#RUN yum -y install vim
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+ENV JAVA_HOME /usr/local/jdk1.8.0_271
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+ENV CATALINA_HOME /usr/local/apache-tomcat-7.0.70
+ENV CATALINA_BASH /usr/local/apache-tomcat-7.0.70
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib:$CATALINA_HOME/bin
+
+EXPOSE 8080
+
+CMD /usr/local/apache-tomcat-7.0.70/bin/startup.sh && tail -F /usr/local/apache-tomcat-7.0.70/bin/logs/catalina.out
+
+# 2、构建镜像(最后 “.”,代表本目录下)
+docker build -t zcg/tomcat:1.0 .
+# 3、运行镜像
+docker run -d -p 9090:8080 --name tomcat01 \
+-v /home//tomcat/test:/usr/local/apache-tomcat-7.0.70/webapps/test \
+-v /home/tomcat/tomcatlogs/:/usr/local/apache-tomcat-7.0.70/logs zcg/tomcat:1.0
+
+
+```
+
+```shell
+FROM         centos
+#把java添加到容器中
+ADD jdk-8u271-linux-i586.tar.gz    /usr/local/
+
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+#配置java与tomcat环境变量
+ENV JAVA_HOME /usr/local/jdk1.8.0_271
+ENV JRE_HOME $JAVA_HOME/jre
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar::$JRE_HOME/lib/
+ENV PATH $PATH:$JAVA_HOME/bin
+
+EXPOSE 8080
+RUN java -veriosn 
+```
 
 
 
