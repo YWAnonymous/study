@@ -1,4 +1,6 @@
-## Nosql概述
+# Redis资料
+
+## 1、Nosql概述
 
 > nosql简介
 
@@ -29,7 +31,7 @@ CA    传统oracle数据库
 AP	  大多数网站架构的选择
 CP    redis、mongodb 	
 
-## Redis 概述
+## 2、Redis 概述
 
 > Redis是什么	
 
@@ -57,7 +59,7 @@ flushdb  #清除当前数据库
 flushall #清除全部数据库的内容 
 ```
 
-## 五大数据类型
+## 3、五大数据类型
 
 ### Redis-key
 
@@ -235,3 +237,92 @@ zcount myset 1 3              # 获取指定区间的成员数量！
 案例思路：set 排序 存储班级成绩表，工资表排序！ 
 
 普通消息，1， 重要消息 2，带权重进行判断！
+
+## 4、Linux安装
+
+```shell
+# 1、官网下载安装包
+redis-5.0.10.tar.gz
+# 2、解压缩
+tar -zxvf redis-5.0.10.tar.gz
+# 3、安装基础环境：redis使用c++编写
+yum install gcc-c++
+# 4、进入压缩之后文件编译redis
+make && make install
+
+# 5、redis的默认安装路径 /usr/local/bin
+# 将安装目录下配置文件redis.conf拷贝到自己的目录下
+[/usr/local/bin/myconfig]# cp /opt/redis-5.0.10/redis.conf myconfig
+
+# 5、修改配置文件redis.conf  --->开启redis后台守护进程
+daemonize yes
+
+# 6、启动redis服务
+redis-server myconfig/redis.conf
+# 7、可以使用ps -ef|grep redis查看
+# 8、连接redis-cli
+redis-cli -p 6379
+
+# 9、退出redis服务 shutdown
+退出exit
+```
+
+### make的补充说明
+
+```shell
+# 也可以这样写
+-加上关键字 PREFIX
+make PREFIX=/usr/local/redis install
+PREFIX= 作用是编译的时候用于指定程序存放的路径。比如我们现在就是指定了redis必须存放在/usr/local/redis目录。假设不添加该关键字Linux会将可执行文件存放在/usr/local/bin目录，
+
+#库文件会存放在/usr/local/lib目录。配置文件会存放在/usr/local/etc目录。其他的资源文件会存放在usr/local/share目录。这里指定号目录也方便后续的卸载，后续直接rm -rf /usr/local/redis 即可删除redis。
+
+首先我们要知道redis 需要使用内存分配器的， make  MALLOC=jemalloc  就是指定内存分配器为 jemalloc ，make MALLOC=libc 就是指定内存分配器为 libc ，这个是有安全隐患的，jemalloc 内存分配器在实践中处理内存碎片是要比libc 好的，而且在README.md 文档也说明到了，jemalloc内存分配器也是包含在源码包里面的，可以在deps  目录下看到 jemalloc 目录。
+```
+
+## 5、==Redis持久化==
+
+Redis 是内存数据库，如果不将内存中的数据库状态保存到磁盘，那么一旦服务器进程退出，服务器中 的数据库状态也会消失。所以 Redis 提供了持久化功能！
+
+### RDB（Redis DataBase）
+
+```markdown
+在指定的时间间隔内将内存中的数据集快照写入磁盘，也就是行话讲的Snapshot快照，它恢复时是将快照文件直接读到内存里。
+
+Redis会单独创建（fork）一个子进程来进行持久化，会先将数据写入到一个临时文件中，待持久化过程都结束了，再用这个临时文件替换上次持久化好的文件。整个过程中，主进程是不进行任何IO操作的。这就确保了极高的性能。如果需要进行大规模数据的恢复，且对于数据恢复的完整性不是非常敏感，那RDB方式要比AOF方式更加的高效。RDB的缺点是最后一次持久化后的数据可能丢失。我们默认的就是RDB，一般情况下不需要修改这个配置！
+
+有时候在生产环境我们会将这个文件进行备份！
+
+rdb保存的文件是dump.rdb 都是在我们的配置文件redis.conf中快照中进行配置的！
+```
+
+==AAA==
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
