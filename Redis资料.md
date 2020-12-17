@@ -592,21 +592,71 @@ sentinel notification-script mymaster /var/redis/notify.sh
 sentinel client-reconfig-script mymaster /var/redis/reconfig.sh # 一般都是由运维来配置！
 ```
 
+## 8、java操作redis
 
+### 环境准备
 
+```java
+<!--引入jedis连接依赖-->
+<dependency>
+  <groupId>redis.clients</groupId>
+  <artifactId>jedis</artifactId>
+  <version>2.9.0</version>
+</dependency>
 
+public static void main(String[] args) {
+   //1.创建jedis对象
+   Jedis jedis = new Jedis("192.168.40.4", 6379);//1.redis服务必须关闭防火墙  2.redis服务必须开启远程连接
+   jedis.select(0);//选择操作的库默认0号库
+   //2.执行相关操作
+   //....
+   //3.释放资源
+   jedis.close();
+ }
+```
 
+## 9、springboot整合redis
 
+Spring Boot Data(数据) Redis 中提供了**RedisTemplate和StringRedisTemplate**，其中StringRedisTemplate是RedisTemplate的子类，两个方法基本一致，不同之处主要体现在操作的数据类型不同，**RedisTemplate中的两个泛型都是Object，意味着存储的key和value都可以是一个对象，而StringRedisTemplate的两个泛型都是String，意味着StringRedisTemplate的key和value都只能是字符串。**
 
+`注意: 使用RedisTemplate默认是将对象序列化到Redis中,所以放入的对象必须实现对象序列化接口`
 
+### 环境准备
 
+> 说明： 在 SpringBoot2.x 之后，原来使用的jedis 被替换为了 lettuce
+>
+>  jedis : 采用的直连，多个线程操作的话，是不安全的，如果想要避免不安全的，使用 jedis pool 连接 池！ 更像 BIO 模式
+>
+>  lettuce : 采用netty，实例可以再多个线程中进行共享，不存在线程不安全的情况！可以减少线程数据 了，更像 NIO 模式
 
+#### 1、引入依赖
 
+```xml
+<dependency>
+  <groupId>org.springframework.boot</groupId>
+  <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
 
+#### 2、application.properties
 
+```properties
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.redis.database=0
+```
 
+#### 3、RedisTemplate
 
+`redistemplate默认的序列化方式是JDK序列化，也可以设置json序列化`
 
+```java
+//设置redistemplate值使用对象序列化策略
+Jackson2JsonRedisSerializer
+    jackson2JsonRedisSerializer = new Jackson2JsonRedisSerializer(Object.class));
+redisTemplate.setValueSerializer(new JdkSerializationRedisSerializer());//使用JDK序列化
+//redisTemplate.setValueSerializer(jackson2JsonRedisSerializer);  //使用json序列化
+```
 
 
 
